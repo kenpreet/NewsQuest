@@ -8,7 +8,9 @@ import HolographicPanel from "./components/HolographicPanel";         // ensure 
 import SlideInNewsPanel from "./components/SlideInNewsPanel";         // ensure default export
 import SlideInSourcesPanel from "./components/SlideInSourcesPanel";   // ensure default export
 import LoadingState from "./components/LoadingState";
-import { Truck, Plane, Zap, Map, Radio, Activity, Globe } from "lucide-react";
+import 'mapbox-gl/dist/mapbox-gl.css'
+import Map from "react-map-gl/mapbox";
+import { Truck, Plane, Zap, Radio, Activity, Globe } from "lucide-react";
 import "./App.css";
 
 export default function App() {
@@ -21,6 +23,8 @@ export default function App() {
   const [showNewsPanel, setShowNewsPanel] = useState(false);
   const [showSourcesPanel, setShowSourcesPanel] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [lng, setLng] = useState(70.9629)
+  const [lat, setLat] = useState(22.5937)
 
   const handleKeyPress = useCallback(
     (event) => {
@@ -285,13 +289,19 @@ export default function App() {
             <div className="map-card-glow" />
             <HolographicPanel>
               <div className="map-card">
-                <EnhancedIndiaMap
-                  onStateDetected={setCurrentState}
-                  carPosition={carPosition}
-                  onStateSelect={moveToState}
-                  activeVehicle={activeVehicle}
-                  onVehicleChange={setActiveVehicle}
-                  isMoving={isMoving}
+                <Map
+                  mapboxAccessToken="pk.eyJ1IjoiaGFyc2hrd2F0cmEiLCJhIjoiY21ocHR6djhuMG8zbDJscW9lbHh4NzNyaiJ9.VmsKlftsbG1RLmfp32-RgQ"
+                  style={{
+                    width: "500px",
+                    height: "500px",
+                    borderRadius: "15px"
+                  }}
+                  initialViewState={{
+                    longitude: lng,
+                    latitutde: lat,
+                    zoom: 2.5
+                  }}
+                  mapStyle="mapbox://styles/mapbox/streets-v9"
                 />
                 <NewsVehicles
                   position={carPosition}

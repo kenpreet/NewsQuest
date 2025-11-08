@@ -31,11 +31,11 @@ export default function HolographicPanel({
         />
 
         {/* Scanline */}
-        <motion.div
+        {/* <motion.div
           className="holo-scanline"
           animate={{ top: ["0%", "100%"] }}
           transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-        />
+        /> */}
 
         {/* Corner Accents */}
         <div className="corner corner-tl" />

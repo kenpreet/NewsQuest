@@ -29,14 +29,14 @@
 }
 
 /* Scanline */
-.holo-scanline {
+/* .holo-scanline {
   position: absolute;
   left: 0;
   height: 1px;
   width: 100%;
   background: linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent);
   pointer-events: none;
-}
+} */
 
 /* Corner Marks */
 .corner {
