@@ -298,7 +298,7 @@ export default function App() {
                   }}
                   initialViewState={{
                     longitude: lng,
-                    latitutde: lat,
+                    latitude: lat,
                     zoom: 2.5
                   }}
                   mapStyle="mapbox://styles/mapbox/streets-v9"
