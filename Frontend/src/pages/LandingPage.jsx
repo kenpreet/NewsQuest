@@ -338,7 +338,7 @@ export default function LandingPage() {
                                     }}
                                     mapStyle="mapbox://styles/mapbox/streets-v9"
                                 >
-                                    <Source id="india-states" type="geojson" data="/data/india_states.geojson">
+                                    <Source id="india-states" type="geojson" data="/data/india_state.geojson">
                                         <Layer
                                             id="states-fill"
                                             type="fill"
