@@ -2,52 +2,80 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { X, Newspaper, Clock, ExternalLink, TrendingUp, Eye } from "lucide-react";
 import "./SlideInNewsPanel.css";
+import { fetchNews, detectFakeNews, analyzeBiasAndCredibility, generateCombinedArticle } from "../utils/News_API&AI_HelperFunctions";
 
 export default function SlideInNewsPanel({ state, showNews, onClose }) {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [combinedArticle, setCombinedArticle] = useState("");
+  const [showCombinedModal, setShowCombinedModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generatingMerged, setGeneratingMerged] = useState(false);
+
+
 
   useEffect(() => {
-    if (state && showNews) {
+    if (!state || !showNews) return;
+
+    async function load() {
       setLoading(true);
 
-      // Simulated API fetch
-      setTimeout(() => {
-        setArticles([
-          {
-            id: 1,
-            title: `Breaking: Major Development in ${state}`,
-            summary: `Recent reports from ${state} indicate significant changes in the region's political landscape.`,
-            timestamp: "2 hours ago",
-            category: "Politics",
-            views: "12.4K",
-            trending: true,
-          },
-          {
-            id: 2,
-            title: `${state} Economy Shows Positive Growth`,
-            summary: `Economic indicators reveal promising trends with increased investment and job creation.`,
-            timestamp: "4 hours ago",
-            category: "Economy",
-            views: "8.2K",
-            trending: false,
-          },
-          {
-            id: 3,
-            title: `Infrastructure Projects Announced in ${state}`,
-            summary: `Government unveils development plans improving connectivity and services.`,
-            timestamp: "6 hours ago",
-            category: "Infrastructure",
-            views: "5.7K",
-            trending: false,
-          },
-        ]);
-        setLoading(false);
-      }, 800);
+      try {
+        // 5 articles
+        const news = await fetchNews(state + " India", 5);
+        setArticles(news);
+      } catch (e) {
+        console.error("News fetch error:", e);
+        setArticles([]);
+      }
+
+      setLoading(false);
     }
+
+    load();
   }, [state, showNews]);
 
+
   if (!showNews) return null;
+
+
+  async function generateMerged() {
+    if (!state) return;
+
+    setGeneratingMerged(true);
+
+    try {
+      const news = await fetchNews(state + " India", 5);
+
+      const enriched = [];
+      for (const article of news) {
+        const text = article.content || article.description || "";
+        const source = article?.source?.name || "Unknown";
+
+        const fakeRes = await detectFakeNews(text);
+        const biasRes = await analyzeBiasAndCredibility(text, source);
+
+        enriched.push({
+          ...article,
+          fake: fakeRes,
+          bias: biasRes,
+        });
+      }
+
+      const merged = await generateCombinedArticle(enriched);
+
+      setCombinedArticle(merged);
+      setShowCombinedModal(true);
+    } catch (err) {
+      console.error("Combined article generation failed:", err);
+      setCombinedArticle("Unable to generate combined article.");
+      setShowCombinedModal(true);
+    } finally {
+      setGeneratingMerged(false);
+    }
+  }
+
+
 
   return (
     <motion.div
@@ -101,6 +129,26 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
           <div className="article-count">{articles.length} articles</div>
         </div>
 
+        <button
+          onClick={generateMerged}
+          className="generate-btn"
+          disabled={generating || loading}
+          style={{
+            margin: "10px 0",
+            padding: "10px 14px",
+            borderRadius: "8px",
+            background: "#00b3ff",
+            border: "none",
+            color: "white",
+            cursor: "pointer",
+            width: "100%",
+            opacity: generating ? 0.6 : 1
+          }}
+        >
+          {generating ? "Generating combined article..." : "Generate Combined Article"}
+        </button>
+
+
         {/* Scroll Area */}
         <div className="panel-content">
           {loading ? (
@@ -138,13 +186,81 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
                 <div className="read-more">
                   Read full article <ExternalLink className="meta-icon" />
                 </div>
-
+                <button
+                  onClick={generateMerged}
+                  className="generate-btn"
+                  disabled={generatingMerged || loading}
+                  style={{
+                    margin: "10px 0",
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    background: "#00b3ff",
+                    border: "none",
+                    color: "white",
+                    cursor: "pointer",
+                    width: "100%",
+                    opacity: generatingMerged ? 0.6 : 1
+                  }}
+                >
+                  {generatingMerged ? "Generating combined article..." : "Generate Combined Article"}
+                </button>
                 <div className="bottom-accent"></div>
               </motion.div>
             ))
           )}
         </div>
       </div>
+
+      {showCombinedModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "#0b111a",
+              padding: "20px",
+              borderRadius: "12px",
+              width: "70%",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              color: "white",
+            }}
+          >
+            <h2>Combined AI Article</h2>
+            <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+              {combinedArticle}
+            </p>
+
+            <button
+              style={{
+                marginTop: "20px",
+                background: "#00b3ff",
+                padding: "10px 16px",
+                borderRadius: "8px",
+                border: "none",
+                color: "white",
+                cursor: "pointer",
+              }}
+              onClick={() => setShowCombinedModal(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
     </motion.div>
   );
 }

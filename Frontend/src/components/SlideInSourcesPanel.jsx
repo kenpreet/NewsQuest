@@ -9,6 +9,8 @@ import {
   CheckCircle
 } from "lucide-react";
 import "./SlideInSourcesPanel.css";
+import { analyzeBiasAndCredibility, fetchNews } from "../utils/News_API&AI_HelperFunctions";
+
 
 export default function SlideInSourcesPanel({ state, showNews, onClose }) {
   const [sources, setSources] = useState([]);
@@ -33,51 +35,51 @@ export default function SlideInSourcesPanel({ state, showNews, onClose }) {
   };
 
   useEffect(() => {
-    if (state && showNews) {
-      setLoading(true);
-      setTimeout(() => {
-        setSources([
-          {
-            id: 1,
-            name: "The National Times",
-            bias: "center",
-            biasScore: 5,
-            reliability: 92,
-            coverage: "Comprehensive coverage with balanced reporting",
-            verified: true
-          },
-          {
-            id: 2,
-            name: "Express Daily",
-            bias: "left",
-            biasScore: 3,
-            reliability: 85,
-            coverage: "Progressive perspective on local issues",
-            verified: true
-          },
-          {
-            id: 3,
-            name: "Regional Herald",
-            bias: "right",
-            biasScore: 7,
-            reliability: 88,
-            coverage: "Conservative viewpoint with detailed analysis",
-            verified: true
-          },
-          {
-            id: 4,
-            name: "Independent Voice",
-            bias: "center",
-            biasScore: 5,
-            reliability: 90,
-            coverage: "Fact-based reporting without political lean",
-            verified: false
-          }
-        ]);
-        setLoading(false);
-      }, 900);
+  if (!state || !showNews) return;
+
+  async function loadSources() {
+    setLoading(true);
+
+    try {
+      const news = await fetchNews(state + " India", 5);
+
+      const analyzed = [];
+
+      for (let i = 0; i < news.length; i++) {
+        const article = news[i];
+
+        const text = article.content || article.description || "";
+        const sourceName = article?.source?.name || "Unknown";
+
+        const ai = await analyzeBiasAndCredibility(text, sourceName);
+
+        analyzed.push({
+          id: i + 1,
+          name: sourceName,
+          bias: ai.bias_description.includes("left")
+            ? "left"
+            : ai.bias_description.includes("right")
+            ? "right"
+            : "center",
+          biasScore: ai.bias_score ?? 50,
+          reliability: ai.credibility_score ?? 50,
+          coverage: ai.bias_description,
+          verified: true,
+        });
+      }
+
+      setSources(analyzed);
+    } catch (e) {
+      console.error("SOURCE PANEL AI ERROR:", e);
+      setSources([]);
     }
-  }, [state, showNews]);
+
+    setLoading(false);
+  }
+
+  loadSources();
+}, [state, showNews]);
+
 
   if (!showNews) return null;
 

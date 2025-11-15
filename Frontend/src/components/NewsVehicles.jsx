@@ -123,7 +123,7 @@ export default function NewsVehicles({ position, isMoving, activeVehicle }) {
       className="vehicle-wrapper"
       style={{ left: position.x + offset[0], top: position.y + offset[1] }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      animate={isMoving ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+      animate={isMoving ? { scale: [1, 1.05] } : { scale: 1 }}
     >
       {activeVehicle === "van" && <NewsVan isMoving={isMoving} />}
       {activeVehicle === "helicopter" && <NewsHelicopter isMoving={isMoving} />}
