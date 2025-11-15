@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Newspaper, Clock, ExternalLink, TrendingUp, Eye } from "lucide-react";
+import { Newspaper, Clock, ExternalLink } from "lucide-react";
 import "./SlideInNewsPanel.css";
 import { fetchNews, detectFakeNews, analyzeBiasAndCredibility, generateCombinedArticle } from "../utils/News_API&AI_HelperFunctions";
 
@@ -9,258 +9,226 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
   const [loading, setLoading] = useState(true);
   const [combinedArticle, setCombinedArticle] = useState("");
   const [showCombinedModal, setShowCombinedModal] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [generatingMerged, setGeneratingMerged] = useState(false);
-
-
+  const [generatingSingleId, setGeneratingSingleId] = useState(null);
 
   useEffect(() => {
     if (!state || !showNews) return;
+    let cancelled = false;
 
     async function load() {
       setLoading(true);
-
       try {
-        // 5 articles
         const news = await fetchNews(state + " India", 5);
-        setArticles(news);
+        const normalized = news.map((n, i) => ({ ...n, _localId: n.url || `${state}-${i}` }));
+        if (!cancelled) setArticles(normalized);
       } catch (e) {
         console.error("News fetch error:", e);
-        setArticles([]);
+        if (!cancelled) setArticles([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      setLoading(false);
     }
 
     load();
+    return () => { cancelled = true; };
   }, [state, showNews]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!articles || articles.length === 0) return;
 
-  if (!showNews) return null;
+    (async function analyzeAll() {
+      const enriched = [];
+      for (let i = 0; i < articles.length; i++) {
+        const a = articles[i];
+        if (a._analysis) {
+          enriched.push(a);
+          continue;
+        }
+
+        try {
+          const text = a.content || a.description || "";
+          const biasRes = await analyzeBiasAndCredibility(text, a?.source?.name || "Unknown");
+          let biasCategory = "center";
+          const desc = String(biasRes.bias_description || "").toLowerCase();
+          if (desc.includes("left")) biasCategory = "left";
+          else if (desc.includes("right")) biasCategory = "right";
+
+          const analysis = {
+            biasScore: biasRes.bias_score ?? 50,
+            credibility: biasRes.credibility_score ?? 50,
+            biasDescription: biasRes.bias_description || "",
+            biasCategory,
+          };
+
+          enriched.push({ ...a, _analysis: analysis });
+        } catch (err) {
+          enriched.push({ ...a, _analysis: { biasScore: 50, credibility: 50, biasDescription: "N/A", biasCategory: "center" } });
+        }
+        if (cancelled) break;
+      }
+      if (!cancelled) setArticles(enriched);
+    })();
+
+    return () => { cancelled = true; };
+  }, [articles.length]);
 
 
-  async function generateMerged() {
-    if (!state) return;
-
-    setGeneratingMerged(true);
+  async function generateMergedSingle(article) {
+    if (!article) return;
+    const id = article._localId || article.url || article.title;
+    setGeneratingSingleId(id);
 
     try {
-      const news = await fetchNews(state + " India", 5);
-
-      const enriched = [];
-      for (const article of news) {
-        const text = article.content || article.description || "";
-        const source = article?.source?.name || "Unknown";
-
-        const fakeRes = await detectFakeNews(text);
-        const biasRes = await analyzeBiasAndCredibility(text, source);
-
-        enriched.push({
-          ...article,
-          fake: fakeRes,
-          bias: biasRes,
-        });
-      }
-
-      const merged = await generateCombinedArticle(enriched);
-
+      const text = article.content || article.description || "";
+      const source = article?.source?.name || "Unknown";
+      const fakeRes = await detectFakeNews(text);
+      const biasRes = await analyzeBiasAndCredibility(text, source);
+      const merged = await generateCombinedArticle([{ ...article, fake: fakeRes, bias: biasRes }]);
       setCombinedArticle(merged);
       setShowCombinedModal(true);
     } catch (err) {
-      console.error("Combined article generation failed:", err);
+      console.error("Error generating merged article for single:", err);
       setCombinedArticle("Unable to generate combined article.");
       setShowCombinedModal(true);
     } finally {
-      setGeneratingMerged(false);
+      setGeneratingSingleId(null);
     }
   }
 
+  if (!showNews) return null;
 
+  const getBiasColor = (biasCategory) => {
+    if (biasCategory === "left") return { bar: "#3b82f6", glow: "rgba(59,130,246,0.45)" };
+    if (biasCategory === "right") return { bar: "#ef4444", glow: "rgba(239,68,68,0.45)" };
+    return { bar: "#8b5cf6", glow: "rgba(139,92,246,0.5)" };
+  };
 
   return (
-    <motion.div
-      initial={{ x: "100%" }}
-      animate={{ x: 0 }}
-      exit={{ x: "100%" }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="news-panel"
-    >
-      <div className="panel-glow"></div>
+    <>
+      <motion.aside
+        initial={{ x: "-100%" }}
+        animate={{ x: 0 }}
+        exit={{ x: "-100%" }}
+        transition={{ type: "spring", damping: 24, stiffness: 200 }}
+        className="news-panel unified-left-panel"
+        style={{ zIndex: 1100 }}
+      >
+        <div className="panel-glow" />
 
-      <div classname="panel-container">
-        {/* Header */}
-        <div className="panel-header">
-          <div className="header-left">
-            <motion.div
-              className="header-icon"
-              animate={{
-                boxShadow: [
-                  "0 0 20px rgba(6,182,212,0.3)",
-                  "0 0 40px rgba(6,182,212,0.6)",
-                  "0 0 20px rgba(6,182,212,0.3)",
-                ],
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <Newspaper className="icon-white" />
-            </motion.div>
-
-            <div>
-              <h2 className="header-title">Latest News</h2>
-              <p className="header-sub">{state}</p>
-            </div>
-          </div>
-
-          <motion.button
-            className="close-btn"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={onClose}
-          >
-            <X className="icon-red" />
-          </motion.button>
-        </div>
-
-        {/* Stats */}
-        <div className="stats-row">
-          <div className="live-badge">
-            <div className="live-dot"></div> LIVE FEED
-          </div>
-          <div className="article-count">{articles.length} articles</div>
-        </div>
-
-        <button
-          onClick={generateMerged}
-          className="generate-btn"
-          disabled={generating || loading}
-          style={{
-            margin: "10px 0",
-            padding: "10px 14px",
-            borderRadius: "8px",
-            background: "#00b3ff",
-            border: "none",
-            color: "white",
-            cursor: "pointer",
-            width: "100%",
-            opacity: generating ? 0.6 : 1
-          }}
-        >
-          {generating ? "Generating combined article..." : "Generate Combined Article"}
-        </button>
-
-
-        {/* Scroll Area */}
-        <div className="panel-content">
-          {loading ? (
-            <div className="loading-cards">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="loading-card"></div>
-              ))}
-            </div>
-          ) : (
-            articles.map((a, index) => (
-              <motion.div
-                key={a.id}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="article-card"
-              >
-                <div className="article-top">
-                  <span className="category-chip">{a.category}</span>
-
-                  <div className="article-meta">
-                    {a.trending && (
-                      <span className="trending">
-                        <TrendingUp className="meta-icon" /> Trending
-                      </span>
-                    )}
-                    <span><Eye className="meta-icon" /> {a.views}</span>
-                    <span><Clock className="meta-icon" /> {a.timestamp}</span>
-                  </div>
-                </div>
-
-                <h3 className="article-title">{a.title}</h3>
-                <p className="article-summary">{a.summary}</p>
-
-                <div className="read-more">
-                  Read full article <ExternalLink className="meta-icon" />
-                </div>
-                <button
-                  onClick={generateMerged}
-                  className="generate-btn"
-                  disabled={generatingMerged || loading}
-                  style={{
-                    margin: "10px 0",
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    background: "#00b3ff",
-                    border: "none",
-                    color: "white",
-                    cursor: "pointer",
-                    width: "100%",
-                    opacity: generatingMerged ? 0.6 : 1
-                  }}
-                >
-                  {generatingMerged ? "Generating combined article..." : "Generate Combined Article"}
-                </button>
-                <div className="bottom-accent"></div>
+        <div className="panel-container">
+          {/* header */}
+          <div className="panel-header">
+            <div className="header-left">
+              <motion.div className="header-icon" animate={{ boxShadow: ["0 0 20px rgba(6,182,212,0.3)", "0 0 40px rgba(6,182,212,0.6)"] }} transition={{ duration: 2, repeat: Infinity }}>
+                <Newspaper className="icon-white" />
               </motion.div>
-            ))
-          )}
+
+              <div>
+                <h2 className="header-title">Sources</h2>
+                <p className="header-sub">Bias Analysis · {state}</p>
+              </div>
+            </div>
+
+            <motion.button className="close-btn" whileHover={{ scale: 1.04 }} onClick={onClose}>
+              X
+            </motion.button>
+          </div>
+
+          {/* top stats & generate */}
+          <div className="stats-row">
+            <div className="analysis-mode">
+              <div className="mode-chip">ANALYSIS MODE</div>
+              <div className="sources-count">{articles.length} sources verified</div>
+            </div>
+          </div>
+
+          <div className="panel-content">
+            {loading ? (
+              <div className="loading-cards">
+                {[1,2,3].map(i => <div key={i} className="loading-card"></div>)}
+              </div>
+            ) : (
+              articles.map((a, index) => {
+                const analysis = a._analysis || { biasScore: 50, credibility: 50, biasCategory: "center", biasDescription: "" };
+                const biasColor = getBiasColor(analysis.biasCategory);
+
+                return (
+                  <motion.div key={a._localId || a.url || index} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.04 }} className="article-card unified-article-card">
+                    <div className="article-top-row">
+                      <div className="title-left">
+                        <span className="source-badge">{a?.source?.name || "Unknown"}</span>
+                        <h3 className="article-title">{a.title}</h3>
+                      </div>
+
+                      <div className="meta-inline">
+                        <span className="meta-small"><Clock className="meta-icon" /> {a.publishedAt ? (new Date(a.publishedAt).toLocaleString()) : "—"}</span>
+                      </div>
+                    </div>
+
+                    <p className="article-summary">{a.description || (a.content ? a.content.slice(0,220) + "..." : "")}</p>
+
+                    <div className="analysis-inline">
+                      <div className="analysis-left">
+                        <div className="bias-row">
+                          <div className="bias-label" style={{ backgroundColor: biasColor.bar, boxShadow: `0 8px 24px ${biasColor.glow}` }}>
+                            {analysis.biasCategory === "left" ? "Left-Leaning" : analysis.biasCategory === "right" ? "Right-Leaning" : "Balanced"}
+                          </div>
+                          <div className="bias-meta">Political Bias • {Math.round(analysis.biasScore ?? 50)}/100</div>
+                        </div>
+
+                        <div className="bar-group">
+                          <div className="bar-bg small">
+                            <motion.div className="bar-fill" style={{ backgroundColor: biasColor.bar }} initial={{ width: 0 }} animate={{ width: `${Math.max(0, Math.min(100, analysis.biasScore ?? 50))}%` }} transition={{ duration: 0.9 }} />
+                          </div>
+                        </div>
+
+                        <div className="bar-group" style={{ marginTop: 10 }}>
+                          <div className="bar-title">Reliability</div>
+                          <div className="bar-bg small">
+                            <motion.div className="bar-fill-green" initial={{ width: 0 }} animate={{ width: `${Math.max(0, Math.min(100, analysis.credibility ?? 50))}%` }} transition={{ duration: 0.9 }} />
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <div className="analysis-right">
+                        <a className="read-link" href={a.url} target="_blank" rel="noreferrer">Read full article <ExternalLink className="meta-icon" /></a>
+
+                        <button className="generate-btn" onClick={() => generateMergedSingle(a)} disabled={!!generatingSingleId}>
+                          {generatingSingleId ? "Generating..." : "Generate summary for this article"}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
+      </motion.aside>
 
       {showCombinedModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 9999,
-          }}
-        >
-          <div
-            style={{
-              background: "#0b111a",
-              padding: "20px",
-              borderRadius: "12px",
-              width: "70%",
-              maxHeight: "80vh",
-              overflowY: "auto",
-              color: "white",
-            }}
-          >
-            <h2>Combined AI Article</h2>
-            <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-              {combinedArticle}
-            </p>
+        <div className="ai-modal-overlay">
+          <div className="ai-modal">
+            <div className="ai-modal-header">
+              <h2>Combined AI Article</h2>
+              <button className="close-small" onClick={() => setShowCombinedModal(false)}><X className="meta-icon" /></button>
+            </div>
 
-            <button
-              style={{
-                marginTop: "20px",
-                background: "#00b3ff",
-                padding: "10px 16px",
-                borderRadius: "8px",
-                border: "none",
-                color: "white",
-                cursor: "pointer",
-              }}
-              onClick={() => setShowCombinedModal(false)}
-            >
-              Close
-            </button>
+            <div className="ai-modal-body">
+              <pre style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{combinedArticle}</pre>
+
+              <div className="ai-modal-footer">
+                <div className="meta-small">Credibility: <strong>Auto-computed</strong></div>
+                <div className="meta-small">Bias: <strong>Auto-summary</strong></div>
+              </div>
+            </div>
           </div>
+
+          <div className="ai-modal-backdrop" onClick={() => setShowCombinedModal(false)} />
         </div>
       )}
-
-    </motion.div>
+    </>
   );
 }

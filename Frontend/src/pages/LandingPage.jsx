@@ -19,8 +19,6 @@ import "./LandingPage.css";
 import StateDetector from "../components/StateDetector";
 
 export default function LandingPage() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [isRegistering, setIsRegistering] = useState(false);
     const [carPosition, setCarPosition] = useState({ x: 300, y: 150 });
     const [currentState, setCurrentState] = useState("");
     const [isMoving, setIsMoving] = useState(false);
@@ -35,19 +33,10 @@ export default function LandingPage() {
 
     const navigate = useNavigate();
 
-    // NEW: ref to the Map component (react-map-gl)
     const mapRef = useRef(null);
 
     const handleLogout = () => {
-        console.log("Logging out..."); // 🧩 Debug line
-
-        // Remove the stored token
         localStorage.removeItem("token");
-
-        // Check if token is gone
-        console.log("Token after removal:", localStorage.getItem("token"));
-
-        // Redirect to login page
         window.location.href = "/auth";
     };
 
@@ -450,16 +439,6 @@ export default function LandingPage() {
                 )}
             </AnimatePresence>
 
-            {/* Left Sources Panel */}
-            <AnimatePresence>
-                {showSourcesPanel && currentState && (
-                    <SlideInSourcesPanel
-                        state={currentState}
-                        showNews={showNews && !isMoving}
-                        onClose={() => setShowSourcesPanel(false)}
-                    />
-                )}
-            </AnimatePresence>
 
             {/* Corner details */}
             <motion.div

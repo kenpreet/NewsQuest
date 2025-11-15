@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const GNEWS_API_KEY = "05c0e36e21f75364b136d9263e86d68d";
+const GNEWS_API_KEY = "cab28e1b475601d2ae6029443f146367";
 const GEMINI_API_KEY = "AIzaSyC-2dZKkePOnxppleuZOHL_QFDqIK62kZU";
 
 
