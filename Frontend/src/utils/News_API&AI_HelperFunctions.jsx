@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-const GNEWS_API_KEY = "05c0e36e21f75364b136d9263e86d68d";
-const GEMINI_API_KEY = "AIzaSyC-2dZKkePOnxppleuZOHL_QFDqIK62kZU";
+const GNEWS_API_KEY = import.meta.env.VITE_GNEWS_API;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API;
 
 
 export async function fetchNews(query, n = 5) {

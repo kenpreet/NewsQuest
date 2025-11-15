@@ -129,26 +129,6 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
           <div className="article-count">{articles.length} articles</div>
         </div>
 
-        <button
-          onClick={generateMerged}
-          className="generate-btn"
-          disabled={generating || loading}
-          style={{
-            margin: "10px 0",
-            padding: "10px 14px",
-            borderRadius: "8px",
-            background: "#00b3ff",
-            border: "none",
-            color: "white",
-            cursor: "pointer",
-            width: "100%",
-            opacity: generating ? 0.6 : 1
-          }}
-        >
-          {generating ? "Generating combined article..." : "Generate Combined Article"}
-        </button>
-
-
         {/* Scroll Area */}
         <div className="panel-content">
           {loading ? (
