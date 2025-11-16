@@ -1,4 +1,3 @@
-// src/pages/LandingPage.jsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EnhancedIndiaMap from "../components/EnhancedIndiaMap";
@@ -7,15 +6,12 @@ import ParticleBackground from "../components/ParticleBackground";
 import DataStream from "../components/DataStream";
 import HolographicPanel from "../components/HolographicPanel";
 import SlideInNewsPanel from "../components/SlideInNewsPanel";
-import SlideInSourcesPanel from "../components/SlideInSourcesPanel";
 import LoadingState from "../components/LoadingState";
 import { useNavigate } from "react-router-dom";
 import 'mapbox-gl/dist/mapbox-gl.css'
 import Map, { Source, Layer } from "react-map-gl/mapbox";
 import { Truck, Plane, Zap, Radio, Activity, Globe } from "lucide-react";
 import "./LandingPage.css";
-
-// NEW import
 import StateDetector from "../components/StateDetector";
 
 export default function LandingPage() {
@@ -23,7 +19,7 @@ export default function LandingPage() {
     const [currentState, setCurrentState] = useState("");
     const [isMoving, setIsMoving] = useState(false);
     const [showNews, setShowNews] = useState(false);
-    const [activeVehicle, setActiveVehicle] = useState("van");
+    const [activeVehicle, setActiveVehicle] = useState("helicopter");
     const [isLoading, setIsLoading] = useState(true);
     const [showNewsPanel, setShowNewsPanel] = useState(false);
     const [showSourcesPanel, setShowSourcesPanel] = useState(false);
@@ -46,7 +42,7 @@ export default function LandingPage() {
                 event.preventDefault();
             }
 
-            const step = activeVehicle === "helicopter" || activeVehicle === "drone" ? 15 : 12;
+            const step = activeVehicle === "van" || activeVehicle === "drone" ? 15 : 12;
             setIsMoving(true);
             setShowNews(false);
             setShowNewsPanel(false);

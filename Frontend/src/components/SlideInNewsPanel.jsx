@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Newspaper, Clock, ExternalLink } from "lucide-react";
 import "./SlideInNewsPanel.css";
+import "./SlideInSourcesPanel.css"
 import { fetchNews, detectFakeNews, analyzeBiasAndCredibility, generateCombinedArticle } from "../utils/News_API&AI_HelperFunctions";
 
 export default function SlideInNewsPanel({ state, showNews, onClose }) {
