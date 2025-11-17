@@ -3,6 +3,18 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
 
+const getBackendUrl = () => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  if (typeof window === 'undefined') return 'http://localhost:5000';
+  const { hostname } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:5000';
+  }
+  return `${window.location.protocol}//${window.location.hostname}`;
+};
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(null); // null = loading state
 
@@ -14,7 +26,8 @@ export default function App() {
     }
 
     // Verify token with backend
-    fetch("http://localhost:5000/api/auth/verify", {
+    const backendUrl = getBackendUrl();
+    fetch(`${backendUrl}/api/auth/verify`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     })

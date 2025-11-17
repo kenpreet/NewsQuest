@@ -12,6 +12,7 @@ const app = express();
 app.use(cors({
   origin: [
     "https://news-quest-theta.vercel.app",
+    "https://newsquest-6kr0.onrender.com",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000"

@@ -1,14 +1,17 @@
 const GNEWS_API_KEY = "31aec11820766482a0bfe118571c2fe1";
 
-// Detect backend URL: use current domain in production, localhost in development
+// Get backend URL from environment or detect from domain
 const getBackendUrl = () => {
+  // Use Vite env variable if available
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  // Fallback: auto-detect
   if (typeof window === 'undefined') return 'http://localhost:5000';
-  const { protocol, hostname, port } = window.location;
-  // In production, backend is at same domain; in dev, use localhost:5000
+  const { protocol, hostname } = window.location;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'http://localhost:5000';
   }
-  // Production: assume backend is at same domain (e.g., yourdomain.com/api)
   return `${protocol}//${hostname}`;
 };
 

@@ -1,5 +1,17 @@
 import React, { useState } from "react";
 
+const getBackendUrl = () => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  if (typeof window === 'undefined') return 'http://localhost:5000';
+  const { hostname } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:5000';
+  }
+  return `${window.location.protocol}//${window.location.hostname}`;
+};
+
 export default function AuthForm({ isLogin }) {
     const [formData, setFormData] = useState({
         name: "",
@@ -15,9 +27,10 @@ export default function AuthForm({ isLogin }) {
 const handleSubmit = async (e) => {
   e.preventDefault();
 
+  const backendUrl = getBackendUrl();
   const url = isLogin
-    ? "http://localhost:5000/api/auth/login"
-    : "http://localhost:5000/api/auth/register";
+    ? `${backendUrl}/api/auth/login`
+    : `${backendUrl}/api/auth/register`;
 
   const body = isLogin
     ? { email: formData.email, password: formData.password }
