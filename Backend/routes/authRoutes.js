@@ -2,16 +2,16 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { verifyToken } from "../middleware/verifyToken.js";  // ✅ import AFTER router created
+import { verifyToken } from "../middleware/verifyToken.js";
 
-const router = express.Router(); // ✅ create router FIRST
+const router = express.Router();
 
-// 🟢 Verify Token (for session persistence)
+// Verify token (session persistence)
 router.get("/verify", verifyToken, (req, res) => {
   res.json({ message: "Token is valid", userId: req.user.id });
 });
 
-// 🟢 Register
+// Register
 router.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -29,7 +29,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// 🟢 Login
+// Login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 

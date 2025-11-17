@@ -1,142 +1,37 @@
-import { useState } from "react";
-
-const GNEWS_API_KEY = "cab28e1b475601d2ae6029443f146367";
-const GEMINI_API_KEY = "AIzaSyC-2dZKkePOnxppleuZOHL_QFDqIK62kZU";
-
+const GNEWS_API_KEY = "31aec11820766482a0bfe118571c2fe1";
 
 export async function fetchNews(query, n = 5) {
   const url = `https://gnews.io/api/v4/search?q=${query}&lang=en&max=${n}&apikey=${GNEWS_API_KEY}`;
-
   const res = await fetch(url);
   const data = await res.json();
-
   return data.articles || [];
 }
 
-async function callGemini(prompt) {
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent?key=" + GEMINI_API_KEY,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    }
-  );
-
-  const json = await response.json();
-  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  return text.trim();
-}
-
-export async function detectFakeNews(text) {
-  if (!text || text.trim() === "") {
-    return { label: "UNCERTAIN", confidence: 0.0 };
-  }
-
-  const prompt = `
-You are an expert in misinformation detection.
-Analyze the text and return ONLY a JSON object:
-
-{
-  "label": "FAKE" | "REAL" | "UNCERTAIN",
-  "confidence": number (0 to 1)
-}
-
-Text:
-${text}
-  `;
-
+// Call Python pipeline via backend to generate article
+export async function generateArticleFromPipeline(query, article = null) {
   try {
-    const raw = await callGemini(prompt);
-    return JSON.parse(raw);
-  } catch {
-    return { label: "UNCERTAIN", confidence: 0.5 };
+    const response = await fetch(
+      "http://localhost:5000/api/gemini/generate",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userMessage: `Generate article for: ${query}`,
+          article: article  // Send the article as fallback
+        }),
+      }
+    );
+    const json = await response.json();
+    const content = json?.content || "No article generated";
+    const metrics = {
+      biasScore: json?.biasScore ?? 50,
+      credibilityScore: json?.credibilityScore ?? json?.credibility ?? 75,
+      biasCategory: json?.biasCategory ?? "center"
+    };
+
+    return { content, metrics };
+  } catch (error) {
+    console.error("Pipeline error:", error);
+    return { content: "Error generating article", metrics: { biasScore: 50, credibilityScore: 75, biasCategory: 'center' } };
   }
-}
-
-function extractJson(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-export async function analyzeBiasAndCredibility(content, source) {
-  const prompt = `
-You are a media analysis expert.
-Return JSON in this format:
-
-{
- "bias_score": number (0-100),
- "credibility_score": number (0-100),
- "bias_description": "string"
-}
-
-Source: ${source}
-Article:
-${content}
-  `;
-
-  const text = await callGemini(prompt);
-  const parsed = extractJson(text);
-
-  if (parsed) return parsed;
-
-  return {
-    bias_score: null,
-    credibility_score: null,
-    bias_description: text,
-  };
-}
-
-function buildMetadata(article, fakeResult, biasResult) {
-  return {
-    title: article.title,
-    source: article?.source?.name,
-    url: article.url,
-    publishedAt: article.publishedAt,
-    description: article.description,
-    content: article.content,
-    fake_news_label: fakeResult.label,
-    fake_confidence: fakeResult.confidence,
-    bias_score: biasResult.bias_score,
-    credibility_score: biasResult.credibility_score,
-    bias_description: biasResult.bias_description,
-  };
-}
-
-export async function runFullPipeline(topic = "global warming", count = 5) {
-  const articles = await fetchNews(topic, count);
-  const results = [];
-
-  for (const article of articles) {
-    const content = article.content || article.description || "";
-
-    const fakeRes = await detectFakeNews(content);
-    const biasRes = await analyzeBiasAndCredibility(content, article?.source?.name);
-
-    results.push(buildMetadata(article, fakeRes, biasRes));
-  }
-
-  return results; 
-}
-
-export async function generateCombinedArticle(jsonData) {
-  const prompt = `
-You are a balanced journalist AI.
-Write a neutral, factual combined news article using:
-
-${JSON.stringify(jsonData)}
-
-Rules:
-- Summarize consistent facts.
-- If sources disagree, show both perspectives.
-- No emotional or political tone.
-  `;
-
-  const result = await callGemini(prompt);
-  return result;
 }

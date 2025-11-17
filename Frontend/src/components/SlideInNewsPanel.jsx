@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Newspaper, Clock, ExternalLink } from "lucide-react";
 import "./SlideInNewsPanel.css";
-import "./SlideInSourcesPanel.css"
-import { fetchNews, detectFakeNews, analyzeBiasAndCredibility, generateCombinedArticle } from "../utils/News_API&AI_HelperFunctions";
+import { fetchNews, generateArticleFromPipeline } from "../utils/News_API&AI_HelperFunctions";
 
 export default function SlideInNewsPanel({ state, showNews, onClose }) {
   const [articles, setArticles] = useState([]);
@@ -11,6 +10,7 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
   const [combinedArticle, setCombinedArticle] = useState("");
   const [showCombinedModal, setShowCombinedModal] = useState(false);
   const [generatingSingleId, setGeneratingSingleId] = useState(null);
+  const [modalMetrics, setModalMetrics] = useState({ biasScore: 50, credibilityScore: 75, biasCategory: "center" });
 
   useEffect(() => {
     if (!state || !showNews) return;
@@ -20,7 +20,12 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
       setLoading(true);
       try {
         const news = await fetchNews(state + " India", 5);
-        const normalized = news.map((n, i) => ({ ...n, _localId: n.url || `${state}-${i}` }));
+        // Add lightweight frontend analysis for each article
+        const normalized = news.map((n, i) => {
+          const base = { ...n, _localId: n.url || `${state}-${i}` };
+          base._analysis = analyzeArticleFrontend(base);
+          return base;
+        });
         if (!cancelled) setArticles(normalized);
       } catch (e) {
         console.error("News fetch error:", e);
@@ -34,67 +39,73 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
     return () => { cancelled = true; };
   }, [state, showNews]);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!articles || articles.length === 0) return;
-
-    (async function analyzeAll() {
-      const enriched = [];
-      for (let i = 0; i < articles.length; i++) {
-        const a = articles[i];
-        if (a._analysis) {
-          enriched.push(a);
-          continue;
-        }
-
-        try {
-          const text = a.content || a.description || "";
-          const biasRes = await analyzeBiasAndCredibility(text, a?.source?.name || "Unknown");
-          let biasCategory = "center";
-          const desc = String(biasRes.bias_description || "").toLowerCase();
-          if (desc.includes("left")) biasCategory = "left";
-          else if (desc.includes("right")) biasCategory = "right";
-
-          const analysis = {
-            biasScore: biasRes.bias_score ?? 50,
-            credibility: biasRes.credibility_score ?? 50,
-            biasDescription: biasRes.bias_description || "",
-            biasCategory,
-          };
-
-          enriched.push({ ...a, _analysis: analysis });
-        } catch (err) {
-          enriched.push({ ...a, _analysis: { biasScore: 50, credibility: 50, biasDescription: "N/A", biasCategory: "center" } });
-        }
-        if (cancelled) break;
-      }
-      if (!cancelled) setArticles(enriched);
-    })();
-
-    return () => { cancelled = true; };
-  }, [articles.length]);
-
-
-  async function generateMergedSingle(article) {
+  // Simple button click: call pipeline and display result
+  async function generateArticle(article) {
     if (!article) return;
     const id = article._localId || article.url || article.title;
     setGeneratingSingleId(id);
 
     try {
-      const text = article.content || article.description || "";
-      const source = article?.source?.name || "Unknown";
-      const fakeRes = await detectFakeNews(text);
-      const biasRes = await analyzeBiasAndCredibility(text, source);
-      const merged = await generateCombinedArticle([{ ...article, fake: fakeRes, bias: biasRes }]);
-      setCombinedArticle(merged);
+      const query = article.title || state || "news";
+      const result = await generateArticleFromPipeline(query, article);
+      // result: { content, metrics }
+      const article_text = result?.content || 'No article';
+      const metrics = result?.metrics || { biasScore: 50, credibilityScore: 75, biasCategory: 'center' };
+      setModalMetrics({ biasScore: metrics.biasScore, credibilityScore: metrics.credibilityScore, biasCategory: metrics.biasCategory });
+      setCombinedArticle(article_text);
       setShowCombinedModal(true);
     } catch (err) {
-      console.error("Error generating merged article for single:", err);
-      setCombinedArticle("Unable to generate combined article.");
+      console.error("Error generating article:", err);
+      setCombinedArticle("Error generating article. Please try again.");
       setShowCombinedModal(true);
     } finally {
       setGeneratingSingleId(null);
     }
+  }
+
+  // Lightweight frontend analysis (same logic as backend) to populate side-panel bars
+  function analyzeArticleFrontend(article) {
+    const text = ((article.title || "") + " " + (article.description || "") + " " + (article.content || "")).toLowerCase();
+    let biasScore = 50;
+    let credibility = 75;
+    let biasCategory = "center";
+
+    const reputableSources = ["bbc", "reuters", "ap news", "associated press", "times of india", "the hindu", "nyt", "new york times"];
+    const questionableSources = ["medium", "blog", "wordpress", "unverified"];
+    const src = (article.source?.name || "").toLowerCase();
+    if (reputableSources.some(s => src.includes(s))) credibility = 85;
+    else if (questionableSources.some(s => src.includes(s))) credibility = 45;
+
+    const leftWords = ["progressive","liberal","climate","workers","welfare","inequality"];
+    const rightWords = ["conservative","traditional","law and order","sovereignty","business","tax"];
+    let left=0,right=0,neutral=0;
+    leftWords.forEach(w=> { if (text.includes(w)) left+=1; });
+    rightWords.forEach(w=> { if (text.includes(w)) right+=1; });
+    if (text.includes("according to")||text.includes("reported")||text.includes("data")) neutral+=1;
+
+    if (left>right) { biasScore = Math.max(0, 40 - left*2); biasCategory = "left"; }
+    else if (right>left) { biasScore = Math.min(100, 60 + right*2); biasCategory = "right"; }
+    else { biasScore = 50; biasCategory = "center"; }
+
+    return { biasScore, credibility, biasCategory };
+  }
+
+  // Render combinedArticle text: support markdown-like bold lines wrapped
+  function renderArticleContent(text) {
+    if (!text) return <div>No content</div>;
+    const lines = text.split('\n').filter(Boolean);
+    return (
+      <div>
+        {lines.map((ln, idx) => {
+          const trimmed = ln.trim();
+          if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+            const inner = trimmed.replace(/^\*\*/, '').replace(/\*\*$/, '');
+            return <h3 key={idx} style={{ color: '#06b6d4', marginTop: idx===0?0:12 }}>{inner}</h3>;
+          }
+          return <p key={idx} style={{ margin: '8px 0' }}>{ln}</p>;
+        })}
+      </div>
+    );
   }
 
   if (!showNews) return null;
@@ -132,7 +143,7 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
             </div>
 
             <motion.button className="close-btn" whileHover={{ scale: 1.04 }} onClick={onClose}>
-              X
+              ×
             </motion.button>
           </div>
 
@@ -196,8 +207,8 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
                       <div className="analysis-right">
                         <a className="read-link" href={a.url} target="_blank" rel="noreferrer">Read full article <ExternalLink className="meta-icon" /></a>
 
-                        <button className="generate-btn" onClick={() => generateMergedSingle(a)} disabled={!!generatingSingleId}>
-                          {generatingSingleId ? "Generating..." : "Generate summary for this article"}
+                        <button className="generate-btn" onClick={() => generateArticle(a)} disabled={generatingSingleId === (a._localId || a.url || index)}>
+                          {generatingSingleId === (a._localId || a.url || index) ? "Generating..." : "Generate summary for this article"}
                         </button>
                       </div>
                     </div>
@@ -214,15 +225,17 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
           <div className="ai-modal">
             <div className="ai-modal-header">
               <h2>Combined AI Article</h2>
-              <button className="close-small" onClick={() => setShowCombinedModal(false)}><X className="meta-icon" /></button>
+              <button className="close-small" onClick={() => setShowCombinedModal(false)}>×</button>
             </div>
 
             <div className="ai-modal-body">
-              <pre style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{combinedArticle}</pre>
+              <div style={{ color: 'white', lineHeight: 1.6 }}>
+                {renderArticleContent(combinedArticle)}
+              </div>
 
               <div className="ai-modal-footer">
-                <div className="meta-small">Credibility: <strong>Auto-computed</strong></div>
-                <div className="meta-small">Bias: <strong>Auto-summary</strong></div>
+                <div className="meta-small">Credibility: <strong>{modalMetrics.credibilityScore ?? modalMetrics.credibility}/100</strong></div>
+                <div className="meta-small">Bias: <strong>{modalMetrics.biasCategory === "left" ? "Left-Leaning" : modalMetrics.biasCategory === "right" ? "Right-Leaning" : "Balanced"} ({modalMetrics.biasScore}/100)</strong></div>
               </div>
             </div>
           </div>

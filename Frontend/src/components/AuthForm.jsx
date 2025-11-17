@@ -51,10 +51,10 @@ const handleSubmit = async (e) => {
       window.location.reload();
     }
 
-  } catch (err) {
-    console.error("❌ Error:", err);
-    alert(err.message);
-  }
+    } catch (err) {
+        console.error("Error:", err);
+        alert(err.message);
+    }
 };
 
 
@@ -109,15 +109,7 @@ const handleSubmit = async (e) => {
                 {isLogin ? "Sign In" : "Create Account"}
             </button>
 
-            {/* <div className="divider">OR CONTINUE WITH</div>
-
-            <button type="button" className="google-btn">
-                <img
-                    src="https://www.svgrepo.com/show/355037/google.svg"
-                    alt="Google"
-                />
-                {isLogin ? "Sign in with Google" : "Sign up with Google"}
-            </button> */}
+            {/* social login removed */}
         </form>
     );
 }

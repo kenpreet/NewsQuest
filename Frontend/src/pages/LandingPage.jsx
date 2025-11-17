@@ -19,7 +19,7 @@ export default function LandingPage() {
     const [currentState, setCurrentState] = useState("");
     const [isMoving, setIsMoving] = useState(false);
     const [showNews, setShowNews] = useState(false);
-    const [activeVehicle, setActiveVehicle] = useState("helicopter");
+    const [activeVehicle, setActiveVehicle] = useState("van");
     const [isLoading, setIsLoading] = useState(true);
     const [showNewsPanel, setShowNewsPanel] = useState(false);
     const [showSourcesPanel, setShowSourcesPanel] = useState(false);
@@ -42,7 +42,7 @@ export default function LandingPage() {
                 event.preventDefault();
             }
 
-            const step = activeVehicle === "van" || activeVehicle === "drone" ? 15 : 12;
+            const step = activeVehicle === "helicopter" || activeVehicle === "drone" ? 15 : 12;
             setIsMoving(true);
             setShowNews(false);
             setShowNewsPanel(false);
