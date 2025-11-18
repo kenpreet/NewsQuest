@@ -15,15 +15,23 @@ const allowedOrigins = [
   "https://newsquest-6kr0.onrender.com",
   "http://localhost:5173",
   "http://localhost:5174",
-  "http://localhost:3000",
-  process.env.FRONTEND_URL // Add from environment variable
+  "http://localhost:3000"
 ];
 
+// Add FRONTEND_URL from env if provided and not already in list
+if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn(`CORS blocked for origin: ${origin}`);
       callback(new Error("CORS not allowed"));
     }
   },

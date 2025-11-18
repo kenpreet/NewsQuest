@@ -1,15 +1,25 @@
 import React, { useState } from "react";
 
 const getBackendUrl = () => {
-  if (import.meta.env.VITE_BACKEND_URL) {
-    return import.meta.env.VITE_BACKEND_URL;
+  const envUrl = import.meta.env.VITE_BACKEND_URL;
+  console.log("Environment VITE_BACKEND_URL:", envUrl);
+  
+  if (envUrl) {
+    console.log("Using VITE_BACKEND_URL:", envUrl);
+    return envUrl;
   }
+  
   if (typeof window === 'undefined') return 'http://localhost:5000';
+  
   const { hostname } = window.location;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log("Using localhost fallback");
     return 'http://localhost:5000';
   }
-  return `${window.location.protocol}//${window.location.hostname}`;
+  
+  const url = `${window.location.protocol}//${window.location.hostname}`;
+  console.log("Using dynamic URL:", url);
+  return url;
 };
 
 export default function AuthForm({ isLogin }) {
@@ -32,6 +42,8 @@ const handleSubmit = async (e) => {
     ? `${backendUrl}/api/auth/login`
     : `${backendUrl}/api/auth/register`;
 
+  console.log("Submitting to:", url);
+
   const body = isLogin
     ? { email: formData.email, password: formData.password }
     : {
@@ -41,13 +53,16 @@ const handleSubmit = async (e) => {
       };
 
   try {
+    console.log("Request body:", body);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
+    console.log("Response status:", res.status);
     const data = await res.json();
+    console.log("Response data:", data);
 
     if (!res.ok) {
       throw new Error(data.message || "Something went wrong!");
