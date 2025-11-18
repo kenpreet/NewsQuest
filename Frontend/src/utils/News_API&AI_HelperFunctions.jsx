@@ -1,5 +1,3 @@
-const GNEWS_API_KEY = "31aec11820766482a0bfe118571c2fe1";
-
 // Get backend URL from environment or detect from domain
 const getBackendUrl = () => {
   // Use Vite env variable if available

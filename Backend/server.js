@@ -9,17 +9,27 @@ import newsRoutes from "./routes/newsRoutes.js";
 dotenv.config();
 const app = express();
 
-// Middlewares
+// Middlewares - CORS configuration
+const allowedOrigins = [
+  "https://news-quest-theta.vercel.app",
+  "https://newsquest-6kr0.onrender.com",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL // Add from environment variable
+];
+
 app.use(cors({
-  origin: [
-    "https://news-quest-theta.vercel.app",
-    "https://newsquest-6kr0.onrender.com",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:3000"
-  ],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
   methods: "GET,POST,PUT,DELETE",
-  credentials: true
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json());
 
