@@ -121,11 +121,6 @@ export default function AuthForm({ isLogin }) {
           placeholder="********"
           onChange={handleChange}
         />
-        {isLogin && (
-          <a href="#" className="forgot-link">
-            Forgot password?
-          </a>
-        )}
       </div>
 
       {!isLogin && (
