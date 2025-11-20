@@ -10,7 +10,7 @@ import json
 import requests
 
 # Configuration
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "cab28e1b475601d2ae6029443f146367")
+GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "40445fddd77e99c49929ba261d885df0")
 
 def fetch_news(query, n=5):
     """Fetch news articles from GNews API"""
