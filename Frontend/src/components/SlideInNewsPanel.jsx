@@ -90,22 +90,100 @@ export default function SlideInNewsPanel({ state, showNews, onClose }) {
     return { biasScore, credibility, biasCategory };
   }
 
-  // Render combinedArticle text: support markdown-like bold lines wrapped
+  // Render combinedArticle text with robust lightweight Markdown support for lists, headings, and bold text
   function renderArticleContent(text) {
     if (!text) return <div>No content</div>;
-    const lines = text.split('\n').filter(Boolean);
-    return (
-      <div>
-        {lines.map((ln, idx) => {
-          const trimmed = ln.trim();
-          if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
-            const inner = trimmed.replace(/^\*\*/, '').replace(/\*\*$/, '');
-            return <h3 key={idx} style={{ color: '#06b6d4', marginTop: idx===0?0:12 }}>{inner}</h3>;
-          }
-          return <p key={idx} style={{ margin: '8px 0' }}>{ln}</p>;
-        })}
-      </div>
-    );
+    
+    // Inline bold helper: replaces **text** with styled strong elements
+    const parseInlineStyles = (txt) => {
+      const parts = [];
+      let lastIndex = 0;
+      const regex = /\*\*(.*?)\*\*/g;
+      let match;
+      
+      while ((match = regex.exec(txt)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(txt.substring(lastIndex, match.index));
+        }
+        parts.push(<strong key={match.index} style={{ color: '#22d3ee', fontWeight: '700' }}>{match[1]}</strong>);
+        lastIndex = regex.lastIndex;
+      }
+      
+      if (lastIndex < txt.length) {
+        parts.push(txt.substring(lastIndex));
+      }
+      
+      return parts.length > 0 ? parts : txt;
+    };
+
+    const lines = text.split('\n');
+    const elements = [];
+    let currentList = [];
+
+    lines.forEach((ln, idx) => {
+      const trimmed = ln.trim();
+      
+      // If it's an empty line, flush list and return
+      if (!trimmed) {
+        if (currentList.length > 0) {
+          elements.push(
+            <ul key={`ul-${idx}`} style={{ paddingLeft: '20px', margin: '10px 0 16px 0', listStyleType: 'disc' }}>
+              {currentList}
+            </ul>
+          );
+          currentList = [];
+        }
+        return;
+      }
+
+      // Check for bullet list item
+      const listMatch = trimmed.match(/^[*+-]\s+(.*)$/);
+      if (listMatch) {
+        const itemContent = listMatch[1];
+        currentList.push(
+          <li key={`li-${idx}`} style={{ margin: '6px 0', color: '#cbd5e1' }}>
+            {parseInlineStyles(itemContent)}
+          </li>
+        );
+        return;
+      }
+
+      // Flush list if this line is not a list item
+      if (currentList.length > 0) {
+        elements.push(
+          <ul key={`ul-${idx}`} style={{ paddingLeft: '20px', margin: '10px 0 16px 0', listStyleType: 'disc' }}>
+            {currentList}
+          </ul>
+        );
+        currentList = [];
+      }
+
+      // Check for headings
+      if (trimmed.startsWith('# ')) {
+        elements.push(<h1 key={idx} style={{ color: '#06b6d4', fontSize: '24px', margin: '20px 0 10px 0', fontWeight: '700' }}>{parseInlineStyles(trimmed.slice(2))}</h1>);
+      } else if (trimmed.startsWith('## ')) {
+        elements.push(<h2 key={idx} style={{ color: '#06b6d4', fontSize: '20px', margin: '18px 0 8px 0', fontWeight: '700' }}>{parseInlineStyles(trimmed.slice(3))}</h2>);
+      } else if (trimmed.startsWith('### ')) {
+        elements.push(<h3 key={idx} style={{ color: '#06b6d4', fontSize: '18px', margin: '16px 0 6px 0', fontWeight: '700' }}>{parseInlineStyles(trimmed.slice(4))}</h3>);
+      } else if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+        const inner = trimmed.replace(/^\*\*/, '').replace(/\*\*$/, '');
+        elements.push(<h3 key={idx} style={{ color: '#06b6d4', fontSize: '18px', margin: '16px 0 6px 0', fontWeight: '700' }}>{parseInlineStyles(inner)}</h3>);
+      } else {
+        // Standard paragraph
+        elements.push(<p key={idx} style={{ margin: '12px 0', color: '#cbd5e1', lineHeight: '1.6' }}>{parseInlineStyles(trimmed)}</p>);
+      }
+    });
+
+    // Flush any remaining list items
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key="ul-end" style={{ paddingLeft: '20px', margin: '10px 0 16px 0', listStyleType: 'disc' }}>
+          {currentList}
+        </ul>
+      );
+    }
+
+    return <div>{elements}</div>;
   }
 
   if (!showNews) return null;
