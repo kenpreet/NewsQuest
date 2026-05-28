@@ -88,32 +88,6 @@ npm run dev
 
 Frontend will run on `http://localhost:5173` (or next available port)
 
-## Project Structure
-
-```
-NewsQuest/
-├── Backend/
-│   ├── config/          (Database config)
-│   ├── middleware/      (Auth middleware)
-│   ├── models/          (MongoDB schemas)
-│   ├── routes/          (API routes)
-│   ├── news_pipeline_simple.py  (News processing)
-│   ├── server.js        (Express server)
-│   └── package.json
-│
-├── Frontend/
-│   ├── src/
-│   │   ├── components/  (React components)
-│   │   ├── pages/       (Page components)
-│   │   ├── utils/       (Helper functions)
-│   │   ├── constants/   (App constants)
-│   │   ├── api/         (API clients)
-│   │   ├── App.jsx      (Root component)
-│   │   └── main.jsx     (Entry point)
-│   ├── public/          (Static assets)
-│   └── package.json
-```
-
 ## API Endpoints
 
 ### Authentication
@@ -130,18 +104,13 @@ NewsQuest/
 
 ### Deploy to Production
 
-**Option 1: Vercel (Frontend) + Heroku/Railway (Backend)**
+**Option 1: Vercel (Frontend) + Render (Backend)**
 
 1. Push to GitHub
 2. Connect frontend to Vercel
-3. Connect backend to Railway/Heroku
+3. Connect backend to Render
 4. Set environment variables on deployment platform
 5. Frontend will auto-detect backend URL
-
-**Option 2: Single VPS**
-- Deploy both frontend and backend on same server
-- Use nginx as reverse proxy
-- Frontend and backend communicate via same domain
 
 ## Environment Variables
 
@@ -171,10 +140,6 @@ GNEWS_API_KEY=your_gnews_api_key
 **Authentication issues:**
 - Clear localStorage and try logging in again
 - Check JWT_SECRET is consistent across restarts
-
-## License
-
-ISC
 
 ## Support
 
