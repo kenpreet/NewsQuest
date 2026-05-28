@@ -169,43 +169,130 @@ router.post("/generate", async (req, res) => {
     let query = userMessage.replace("Generate article for:", "").trim();
     if (!query) query = "global news";
 
+    // 1. Fetch articles from GNews directly in Node.js
+    let articles = [];
+    const gnewsApiKey = process.env.GNEWS_API_KEY;
+    if (gnewsApiKey) {
+      try {
+        const queryUrl = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=5&apikey=${gnewsApiKey}`;
+        const gnewsRes = await fetch(queryUrl);
+        const gnewsData = await gnewsRes.json();
+        articles = gnewsData.articles || [];
+        console.log(`[Gemini Route] Fetched ${articles.length} articles from GNews for query: "${query}"`);
+      } catch (err) {
+        console.error("[Gemini Route] Error fetching GNews articles:", err.message);
+      }
+    }
+
+    // Use single provided article as fallback source if GNews returned nothing
+    if (articles.length === 0 && article) {
+      articles = [article];
+      console.log("[Gemini Route] Using fallback single article provided by frontend");
+    }
+
+    // 2. Direct Google Gemini REST API Integration
+    const geminiKey = process.env.AI_STUDIO_KEY;
+    if (geminiKey && articles.length > 0) {
+      try {
+        const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`;
+        console.log(`[Gemini Route] Triggering direct Gemini API call (${geminiModel})`);
+
+        const systemPrompt = `You are a balanced journalist and media analysis expert. 
+You are given one or more news reports about the topic/query: "${query}".
+
+Analyze the articles and perform the following tasks:
+1. Synthesize a single, factual, neutral, and well-balanced consolidated news article in markdown format. 
+   - Highlight consistent facts across the reports.
+   - If sources disagree, present both perspectives neutrally.
+   - Do NOT include emotional, sensational, or politically biased phrasing.
+   - Format using standard markdown headers, lists, and paragraphs.
+   - Include a section named "**Sources:**" at the end listing the publishers of the articles analyzed.
+2. Evaluate the collective political bias of the articles:
+   - Provide a biasScore between 0 and 100, where 0 is left-leaning, 50 is perfectly neutral/balanced, and 100 is right-leaning.
+   - Classify the biasCategory as "left", "center", or "right".
+3. Evaluate the credibilityScore of the articles between 0 and 100 based on the reputation of the sources and content consistency.
+
+Return ONLY a valid JSON object matching this schema. Do not output any markdown formatting like \`\`\`json or backticks.
+{
+  "content": "Consolidated news article in markdown format...",
+  "biasScore": 50,
+  "biasCategory": "center",
+  "credibilityScore": 85
+}`;
+
+        const promptText = `${systemPrompt}\n\nArticles to analyze:\n${JSON.stringify(articles, null, 2)}`;
+
+        const response = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (responseText) {
+            const result = JSON.parse(responseText.trim());
+            console.log("[Gemini Route] Successfully generated AI summary from Gemini REST API");
+            return res.json({
+              content: result.content,
+              success: true,
+              sources: articles.length,
+              biasScore: result.biasScore ?? 50,
+              credibilityScore: result.credibilityScore ?? 75,
+              biasCategory: result.biasCategory ?? "center",
+              ai_version: "gemini-api"
+            });
+          }
+        } else {
+          const errText = await response.text();
+          console.warn("[Gemini Route] Gemini API returned error status:", response.status, errText);
+        }
+      } catch (geminiErr) {
+        console.error("[Gemini Route] Gemini direct integration failed, falling back to python/offline:", geminiErr);
+      }
+    }
+
+    // 3. Fallback: Spawn Python News Pipeline
     try {
+      console.log("[Gemini Route] Falling back to Python news pipeline");
       const result = await runNewsPipeline(query, 5);
-      
-      
-      // If no articles found, use the provided article as fallback
       let content = result.content;
       let biasScore = 50;
       let credibilityScore = 75;
       let biasCategory = "center";
-      
+
       if (content === "No articles found for the given query." && article) {
-          const analysis = analyzeArticle(article);
-          biasScore = analysis.biasScore;
-          credibilityScore = analysis.credibilityScore;
-          biasCategory = analysis.biasCategory;
+        const analysis = analyzeArticle(article);
+        biasScore = analysis.biasScore;
+        credibilityScore = analysis.credibilityScore;
+        biasCategory = analysis.biasCategory;
 
         const title = article.title || "Article";
         const source = article.source?.name || "Unknown Source";
         const date = article.publishedAt ? new Date(article.publishedAt).toLocaleDateString() : "Unknown Date";
 
-        // Build a combined text from title, description and content and summarize it
         const combined = [title, article.description || '', article.content || ''].join('. ');
         const summaryBody = summarizeText(combined, 7) || (article.description || article.content || 'No useful summary available.');
 
-        // Compose the final content with heading and sources
-        const parts = [];
-        parts.push(`**${title}**`);
-        parts.push("");
-        parts.push(`Source: ${source}`);
-        parts.push(`Published: ${date}`);
-        parts.push("");
-        parts.push(`**Summary:**`);
-        parts.push(summaryBody);
-
+        const parts = [
+          `**${title}**`,
+          "",
+          `Source: ${source}`,
+          `Published: ${date}`,
+          "",
+          `**Summary:**`,
+          summaryBody
+        ];
         content = parts.join("\n\n");
       }
-      
+
       return res.json({
         content: content,
         success: result.success !== false,
@@ -213,14 +300,15 @@ router.post("/generate", async (req, res) => {
         biasScore: biasScore,
         credibilityScore: credibilityScore,
         biasCategory: biasCategory,
-        raw_pipeline_output: result.__raw_output || null
+        raw_pipeline_output: result.__raw_output || null,
+        ai_version: "python-pipeline"
       });
     } catch (pipelineErr) {
-      console.error("Pipeline failed:", pipelineErr.message);
+      console.error("[Gemini Route] Python pipeline fallback failed:", pipelineErr.message);
 
-      // If pipeline failed but the frontend provided a single article, use a local fallback
+      // 4. Ultimate Fallback: Client-provided single article Node-side heuristic analysis
       if (article) {
-        console.log("Using fallback summarizer for provided article");
+        console.log("[Gemini Route] Falling back to local offline heuristic engine");
         const analysis = analyzeArticle(article);
         const biasScore = analysis.biasScore;
         const credibilityScore = analysis.credibilityScore;
@@ -233,15 +321,15 @@ router.post("/generate", async (req, res) => {
         const combined = [title, article.description || '', article.content || ''].join('. ');
         const summaryBody = summarizeText(combined, 7) || (article.description || article.content || 'No useful summary available.');
 
-        const parts = [];
-        parts.push(`**${title}**`);
-        parts.push("");
-        parts.push(`Source: ${source}`);
-        parts.push(`Published: ${date}`);
-        parts.push("");
-        parts.push(`**Summary:**`);
-        parts.push(summaryBody);
-
+        const parts = [
+          `**${title}**`,
+          "",
+          `Source: ${source}`,
+          `Published: ${date}`,
+          "",
+          `**Summary:**`,
+          summaryBody
+        ];
         const content = parts.join("\n\n");
 
         return res.json({
@@ -251,14 +339,14 @@ router.post("/generate", async (req, res) => {
           biasScore,
           credibilityScore,
           biasCategory,
-          fallback: true
+          fallback: true,
+          ai_version: "local-heuristic"
         });
       }
 
-      // If no article provided, return the python stderr/stdout as the content so frontend can display it.
       const errMsg = pipelineErr?.message || String(pipelineErr);
       return res.json({
-        content: errMsg,
+        content: "No news articles or fallback summaries could be processed. Please check your network and API keys.",
         success: false,
         error: "Pipeline execution failed",
         message: errMsg,

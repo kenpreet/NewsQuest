@@ -75,7 +75,7 @@ export default function AuthForm({ isLogin }) {
 
       if (isLogin) {
         localStorage.setItem("token", data.token);
-        window.location.href = "/"; // redirect to Landing Page
+        window.location.href = "/dashboard"; // redirect to Map Dashboard
       } else {
         // After registration, optionally switch to login
         alert("Account created! Please log in now.");
